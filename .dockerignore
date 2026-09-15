@@ -1,0 +1,9 @@
+node_modules
+.git
+.env*
+backups
+.deploy-state
+coverage
+test
+docs
+.github

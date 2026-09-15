@@ -1,0 +1,24 @@
+groups:
+  - name: task-api
+    rules:
+      - alert: ApiDown
+        expr: up{job="task-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Task API metrics endpoint is unavailable
+      - alert: DatabaseUnavailable
+        expr: app_database_ready{job="task-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: API cannot reach PostgreSQL
+      - alert: HighErrorRate
+        expr: sum(rate(http_requests_total{job="task-api",status=~"5.."}[5m])) / clamp_min(sum(rate(http_requests_total{job="task-api"}[5m])), 0.001) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: HTTP server error rate exceeds 5 percent
