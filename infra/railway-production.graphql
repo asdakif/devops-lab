@@ -1,0 +1,13 @@
+# Reapply the production service settings and CI gate. No credentials are stored here.
+mutation ConfigureProduction(
+  $serviceId: String!
+  $environmentId: String!
+  $triggerId: String!
+  $settings: ServiceInstanceUpdateInput!
+) {
+  serviceInstanceUpdate(serviceId: $serviceId, environmentId: $environmentId, input: $settings)
+  deploymentTriggerUpdate(id: $triggerId, input: { checkSuites: true }) {
+    id
+    checkSuites
+  }
+}

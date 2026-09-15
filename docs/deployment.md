@@ -4,7 +4,27 @@ GitHub deposu: [asdakif/devops-lab](https://github.com/asdakif/devops-lab) (öze
 
 ## Railway ile dağıtım
 
-`railway.toml`, mevcut Dockerfile ile build alır ve `/health/ready` yanıtını dağıtım sağlık kontrolü olarak kullanır. Railway’de API ve PostgreSQL ayrı servislerdir; yerel Compose dosyası otomatik olarak dağıtılmaz.
+Canlı API: https://task-api-production-f53c.up.railway.app
+
+Railway projesi: [devops-lab](https://railway.com/project/f15e3b08-abf4-4d86-9e58-6a9d26e599ec), ortam: `production`. API: `task-api`, veritabanı: `Postgres`. Railway’de API ve PostgreSQL ayrı servislerdir; yerel Compose dosyası otomatik olarak dağıtılmaz.
+
+API mevcut Dockerfile ile build alır ve `/health/ready` yanıtını dağıtım sağlık kontrolü olarak kullanır. Servis ayarları ve CI bekleme koşulu `infra/` altında Railway API isteği olarak saklanır. Bu dosyalar mevcut servisi hedefler; proje veya veritabanını yeniden oluşturmaz. Oturum açtıktan sonra ayarları tekrar uygulamak için:
+
+```bash
+railway api --file infra/railway-production.graphql --variables @infra/railway-production.json
+```
+
+Railway CLI’daki eski `railway.toml` biçiminin kullanımdan kaldırılma uyarısı nedeniyle ayarlar desteklenen servis API’si üzerinden uygulanır.
+
+Canlı smoke testi (yalnızca bu bilgisayarda oluşturulan ve Git’e dahil edilmeyen `.env.production` ile):
+
+```bash
+node --env-file=.env.production scripts/smoke.mjs
+```
+
+`.env.production` canlı API token’ını ve adresini içerir. Bu dosyayı paylaşma veya GitHub’a gönderme. Başka bir makinede test için Railway’deki API token’ını güvenli biçimde yerel ortamına tanımla.
+
+Yeni bir ortam kurmak için izlenen adımlar:
 
 1. Railway hesabına giriş yap ve bu proje için proje/production ortamını seç.
 2. PostgreSQL servisi oluştur, API servisindeki `DATABASE_URL` değişkenini bu servisin özel bağlantısına referansla: `${{Postgres.DATABASE_URL}}`.
@@ -15,7 +35,7 @@ GitHub deposu: [asdakif/devops-lab](https://github.com/asdakif/devops-lab) (öze
 
 Bu yolda GitHub’daki SSH `DEPLOY_ENABLED` değişkenini etkinleştirme; otomatik dağıtımı Railway GitHub bağlantısı yürütür. GHCR imajı ayrıca sürüm çıktısı olarak üretilir. Railway dağıtımları ve geri dönüşleri Railway panelinden yönetilir; `scripts/deploy.sh` ve `rollback.sh` aşağıdaki Linux/Compose yöntemi içindir. Prometheus ve yedekleme betikleri şu anda yerel Compose ortamına bağlıdır; Railway’de ayrıca kurulmaları gerekir.
 
-Kaynak: [Railway GitHub otomatik dağıtımları](https://docs.railway.com/deployments/github-autodeploys), [Railway config as code](https://docs.railway.com/config-as-code/reference).
+Kaynak: [Railway GitHub otomatik dağıtımları](https://docs.railway.com/deployments/github-autodeploys), [Railway API](https://docs.railway.com/api).
 
 ## Linux sunucusu ile dağıtım
 

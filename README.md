@@ -2,6 +2,10 @@
 
 Kodunu test edip konteyner olarak paketleyeceğin, PostgreSQL ile çalıştıracağın ve hataları gözlemleyeceğin bir öğrenme projesi. Uygulama REST API’sidir; görev işlemleri curl veya Postman ile yapılır.
 
+**Canlı API:** https://task-api-production-f53c.up.railway.app · [GitHub CI](https://github.com/asdakif/devops-lab/actions) · [Railway projesi](https://railway.com/project/f15e3b08-abf4-4d86-9e58-6a9d26e599ec)
+
+Canlı ortamda API ve PostgreSQL çalışır. `main` dalındaki değişiklikler başarılı GitHub kontrollerinden sonra Railway tarafından dağıtılır. Yerel Prometheus ve yedekleme komutları geliştirme ortamına aittir.
+
 ## Hızlı başlangıç
 
 Gerekenler: Node.js 24, npm ve çalışan Docker Desktop / Docker Engine + Compose v2. Compose sürümünün `secrets.environment` ve `up --wait` desteği olmalı.
@@ -160,7 +164,7 @@ GitHub deposu: [asdakif/devops-lab](https://github.com/asdakif/devops-lab) (öze
 2. Başarılı `main` çalışmasında GHCR’ye commit etiketiyle imaj yükleme.
 3. `DEPLOY_ENABLED=true` ise `production` ortamı üzerinden sunucuya digest ile dağıtım.
 
-Sunucu kurulumu, GitHub değişkenleri ve SSH secret’ları [dağıtım rehberinde](docs/deployment.md). Railway için Dockerfile ve readiness ayarları `railway.toml` dosyasındadır; canlı bağlantı adımları aynı rehberde açıklanır.
+Canlı Railway ayarları ve alternatif Linux/SSH kurulumu [dağıtım rehberinde](docs/deployment.md). Dockerfile, readiness ve CI bekleme ayarlarını yeniden uygulamak için `infra/railway-production.graphql` ile `infra/railway-production.json` kullanılır; bu dosyalar gizli değer içermez.
 
 ## Öğrenme sırası
 
