@@ -3,6 +3,7 @@
   "environmentId": "8b6bfd38-ec4d-4da3-9fdf-aaf944c55fbf",
   "triggerId": "e07ce819-42e3-4c2f-855b-7a3012b583b8",
   "settings": {
+    "builder": "RAILPACK",
     "dockerfilePath": "Dockerfile",
     "healthcheckPath": "/health/ready",
     "healthcheckTimeout": 120,
