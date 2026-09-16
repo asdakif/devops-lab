@@ -1,5 +1,7 @@
 # Operasyon alıştırmaları
 
+[Proje tanıtımı](../README.md) · [Yerel kurulum ve API komutları](local-development.md) · [Dağıtım](deployment.md)
+
 Bu alıştırmaları yerel öğrenme ortamında yap. Uzak ortamda kullanıcı trafiği varsa kesintiyi ayrıca planla.
 
 ## 1. Veritabanı arızasını tanı
@@ -34,7 +36,7 @@ npm run smoke
 
 ## 3. Verinin kalıcılığını doğrula
 
-README komutuyla bir görev oluştur, ID’sini kaydet. `docker compose restart api db` çalıştır. Servisler hazır olduğunda aynı ID’yi sorgula; başlık ve tamamlanma bilgisi korunmalı.
+[API komutlarıyla](local-development.md) bir görev oluştur, ID’sini kaydet. `docker compose restart api db` çalıştır. Servisler hazır olduğunda aynı ID’yi sorgula; başlık ve tamamlanma bilgisi korunmalı.
 
 ## 4. Yedek gerçekten açılıyor mu?
 

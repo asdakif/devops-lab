@@ -1,10 +1,12 @@
 # GitHub ve sunucu bağlantısı
 
+[Proje tanıtımı](../README.md) · [Mimari kararlar](architecture.md) · [Yerel geliştirme](local-development.md)
+
 GitHub deposu: [asdakif/devops-lab](https://github.com/asdakif/devops-lab) (özel).
 
 ## Railway ile dağıtım
 
-Canlı API: https://task-api-production-f53c.up.railway.app
+Canlı API: [task-api-production-f53c.up.railway.app](https://task-api-production-f53c.up.railway.app)
 
 Railway projesi: [devops-lab](https://railway.com/project/f15e3b08-abf4-4d86-9e58-6a9d26e599ec), ortam: `production`. API: `task-api`, veritabanı: `Postgres`. Railway’de API ve PostgreSQL ayrı servislerdir; yerel Compose dosyası otomatik olarak dağıtılmaz.
 
@@ -14,7 +16,7 @@ API mevcut Dockerfile ile build alır ve `/health/ready` yanıtını dağıtım 
 railway api --file infra/railway-production.graphql --variables @infra/railway-production.json
 ```
 
-Railway CLI’daki eski `railway.toml` biçiminin kullanımdan kaldırılma uyarısı nedeniyle ayarlar desteklenen servis API’si üzerinden uygulanır.
+Bu ayar dosyaları mevcut servis ve ortam kimliklerini içerir. Başka bir Railway projesinde kullanılacaksa hedef kimlikler o projeden alınmalıdır. API token’ı ve veritabanı kimlik bilgileri dosyalara dahil değildir.
 
 Canlı smoke testi (yalnızca bu bilgisayarda oluşturulan ve Git’e dahil edilmeyen `.env.production` ile):
 
@@ -41,7 +43,7 @@ Kaynak: [Railway GitHub otomatik dağıtımları](https://docs.railway.com/deplo
 
 Yereldeki proje çalışır durumdayken bu rehberle uzak dağıtımı etkinleştir. Gerekenler: kendi GitHub depon, Docker Engine + Compose v2 kurulu bir Linux sunucusu ve SSH erişimi. İlk pipeline varsayılan olarak Linux amd64 imajı üretir; ARM sunucu için build workflow’una `platforms: linux/arm64` veya çoklu mimari yapılandırması ekle.
 
-## Sunucuyu hazırla
+### Sunucuyu hazırla
 
 1. Dağıtım kullanıcısı için `/opt/devops-task-api` klasörünü oluştur ve yazma izni ver.
 2. Kullanıcının Docker çalıştırabildiğini doğrula. Docker erişiminin host üzerinde geniş yetki verdiğini hesaba katarak bu iş için ayrı kullanıcı kullan.
@@ -55,7 +57,7 @@ SSH tüneliyle sunucudaki API’ye erişim örneği:
 ssh -L 3080:127.0.0.1:3080 -L 9095:127.0.0.1:9095 USER@HOST
 ```
 
-## GitHub ayarları
+### GitHub ayarları
 
 Repo **Settings → Environments** altında `production` oluştur. İstersen bu ortam için reviewer zorunluluğu ekle.
 
@@ -69,7 +71,7 @@ Repo **Settings → Environments** altında `production` oluştur. İstersen bu 
 
 SSH 22 portu kullanılır. `DEPLOY_KNOWN_HOSTS` içeriğini sunucu sağlayıcısındaki veya konsolundaki fingerprint ile doğrula. Workflow host key kontrolünü kapatmaz. Uygulama token’ı ve veritabanı parolası sunucudaki `.env` dosyasında kalır.
 
-## İlk sürüm
+### İlk sürüm
 
 Kendi GitHub deponu remote olarak tanımlayıp `main` dalına gönder. Testler geçince GHCR paketi oluşur; dağıtım etkinse imaj digest’i sunucuya iletilir. `.env`, veriler ve önceki imaj bilgisi sunucuda korunur.
 
@@ -93,7 +95,7 @@ node scripts/smoke.mjs
 
 Workflow başarısız olursa GitHub loglarından test, paketleme veya SSH/health-check aşamasını ayır. Uygulama sağlığı bozuksa `deploy.sh` önceki imajı çalıştırmayı dener ve CI’ı başarısız bırakır; önceki imajın da sağlıklı olacağı varsayılmaz.
 
-## Geri dön
+### Geri dön
 
 ```bash
 cd /opt/devops-task-api

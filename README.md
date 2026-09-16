@@ -1,183 +1,125 @@
-# DevOps Lab — Görev Takip API’si
+# DevOps Task API
 
-Kodunu test edip konteyner olarak paketleyeceğin, PostgreSQL ile çalıştıracağın ve hataları gözlemleyeceğin bir öğrenme projesi. Uygulama REST API’sidir; görev işlemleri curl veya Postman ile yapılır.
+GitHub Actions ile test edilen, Docker ile paketlenen ve Railway üzerinde yayımlanan kişisel DevOps projesi. Görev takip API’si üzerinden uygulama geliştirme, sürekli entegrasyon, dağıtım, gözlemlenebilirlik ve veri kurtarma adımlarını bir araya getirir.
 
-**Canlı API:** https://task-api-production-f53c.up.railway.app · [GitHub CI](https://github.com/asdakif/devops-lab/actions) · [Railway projesi](https://railway.com/project/f15e3b08-abf4-4d86-9e58-6a9d26e599ec)
+**Geliştirici:** [Mehmet Akif Yıldırım](https://github.com/asdakif)
 
-Canlı ortamda API ve PostgreSQL çalışır. `main` dalındaki değişiklikler başarılı GitHub kontrollerinden sonra Railway tarafından dağıtılır. Yerel Prometheus ve yedekleme komutları geliştirme ortamına aittir.
+[Canlı API](https://task-api-production-f53c.up.railway.app) · [Sağlık kontrolü](https://task-api-production-f53c.up.railway.app/health/ready) · [CI çalışmaları](https://github.com/asdakif/devops-lab/actions/workflows/ci.yml) · [Mimari kararlar](docs/architecture.md)
 
-## Hızlı başlangıç
+## Projenin odağı
 
-Gerekenler: Node.js 24, npm ve çalışan Docker Desktop / Docker Engine + Compose v2. Compose sürümünün `secrets.environment` ve `up --wait` desteği olmalı.
+Bir API’yi çalıştırmak, değişiklikleri güvenilir biçimde yayımlamak için tek başına yeterli değildir. Bu proje, kod değişikliğinin testlerden geçmesi, sürüm olarak paketlenmesi, canlıya alınması ve çalışırken gözlemlenmesi için tekrarlanabilir bir süreç oluşturur.
+
+Uygulama alanı bilinçli olarak küçük tutulmuştur: görev oluşturma, listeleme, güncelleme ve silme. Projenin ağırlığı bu uygulamanın etrafındaki teslimat ve operasyon sürecindedir.
+
+## Uygulanan özellikler
+
+| Alan | Uygulama | Kod / yapılandırma |
+| --- | --- | --- |
+| REST API | Girdi doğrulama, sayfalama, Bearer token, JSON hata yanıtları | [src/app.js](src/app.js) |
+| Veri katmanı | PostgreSQL, parametreli sorgular, bağlantı havuzu, kalıcı kayıtlar | [src/store.js](src/store.js) |
+| Konteyner | Çok aşamalı Docker build, root olmayan kullanıcı, healthcheck | [Dockerfile](Dockerfile) |
+| Yerel ortam | API, PostgreSQL ve isteğe bağlı Prometheus | [compose.yaml](compose.yaml) |
+| CI | HTTP ve PostgreSQL testleri, Docker smoke, yedek/restore testi, Prometheus yapılandırma kontrolü | [GitHub Actions](.github/workflows/ci.yml) |
+| Sürümleme | GHCR’ye commit SHA etiketiyle imaj yükleme | [CI package işi](.github/workflows/ci.yml) |
+| Canlı dağıtım | GitHub kontrollerini bekleyen Railway bağlantısı ve readiness kontrolü | [Canlı servis ayarları](infra/railway-production.json) |
+| Gözlemlenebilirlik | İstek kimlikli JSON logları, sayaçlar, gecikme histogramı ve veritabanı metriği | [src/app.js](src/app.js), [monitoring/](monitoring/) |
+| Kurtarma | PostgreSQL yedeği, ayrı veritabanına restore, Compose için imaj geri alma betikleri | [scripts/](scripts/), [operasyon rehberi](docs/operations.md) |
+
+## Mimari ve dağıtım akışı
+
+```mermaid
+flowchart LR
+    Commit[GitHub main] --> CI[GitHub Actions]
+    CI --> Tests[HTTP, PostgreSQL ve Docker testleri]
+    Tests --> Package[GHCR sürüm imajı]
+    CI -->|Kontroller başarılı| Railway[Railway kaynak build]
+    Commit -->|Aynı commit, Dockerfile| Railway
+    Railway --> Ready[Readiness kontrolü]
+    Ready --> API[Canlı API]
+    Client[İstemci] -->|HTTPS| API
+    API -->|Özel ağ| DB[(PostgreSQL)]
+```
+
+Railway, GitHub’daki kaynak koddan kendi imajını oluşturur. GHCR imajı ayrıca sürüm çıktısı olarak saklanır ve alternatif Linux/Compose dağıtımında kullanılabilir. Aktif canlı dağıtım GitHub Actions içindeki SSH işiyle yapılmaz; bu iş isteğe bağlıdır ve mevcut kurulumda kapalıdır.
+
+### Ortamların kapsamı
+
+| Bileşen | Yerel / CI | Canlı Railway |
+| --- | --- | --- |
+| API + veritabanı | Docker Compose, PostgreSQL 17 | Ayrı API ve PostgreSQL 18 servisleri |
+| Sağlık kontrolü | Docker healthcheck | HTTPS readiness ve Railway dağıtım kontrolü |
+| Prometheus | `monitoring` profili; üç alarm kuralı | Henüz kurulmadı |
+| Yedek / restore | Betikler ve gerçek verili otomatik test | Bu repo üzerinden zamanlanmış yedek kurulmadı |
+| Sürüm geri alma | Compose betikleri | Railway dağıtım geçmişi üzerinden yönetim |
+
+Salt okunur dosya sistemi, yeteneklerin kaldırılması ve localhost port kısıtları Compose ayarlarıdır; Railway’e otomatik taşındıkları varsayılmaz.
+
+## Canlı demoyu inceleme
+
+Arayüz yerine JSON dönen bir REST API sunulur. Genel sağlık uçları token gerektirmez:
 
 ```bash
+curl -fsS https://task-api-production-f53c.up.railway.app/health/ready
+```
+
+Başarılı yanıt `status: "ready"` ve yayımlanan Git commit’inin SHA değerini içerir. Böylece [GitHub commit geçmişi](https://github.com/asdakif/devops-lab/commits/main/) ile çalışan sürüm karşılaştırılabilir.
+
+`/tasks` ve `/metrics` uçları token gerektirir. Kimlik bilgileri repoda paylaşılmaz; görev işlemleri için yerel kurulumu kullanabilir veya yetkili erişimle canlı smoke testini çalıştırabilirsin.
+
+## Yerelde çalıştırma
+
+Gerekenler: Node.js 24, npm, çalışan Docker ve Compose v2. Depoya erişimin varsa:
+
+```bash
+git clone https://github.com/asdakif/devops-lab.git
+cd devops-lab
 npm ci
 npm run setup
 docker compose --profile monitoring up -d --build --wait
 npm run smoke
 ```
 
-`npm run setup` rastgele parola ve API token’ı üretip `.env` dosyasına yazar. Var olan `.env` dosyasına dokunmaz. Bu dosya Git’e dahil edilmez. Veritabanı volume’ü oluştuktan sonra `.env` içindeki parolayı değiştirmek PostgreSQL kullanıcısının parolasını değiştirmez.
+`npm run setup`, rastgele kimlik bilgilerini `.env` dosyasına yazar; mevcut dosyayı korur. API [localhost:3080](http://localhost:3080), Prometheus [localhost:9095](http://localhost:9095) adresinden erişilir. `npm run smoke`, geçici bir görev üzerinde oluşturma, okuma, güncelleme ve silme işlemlerini doğrular.
 
-| Adres | İşlev |
+[API örnekleri, geliştirme modu ve tüm komutlar →](docs/local-development.md)
+
+## Test ve doğrulama
+
+| Kontrol | Kapsam |
 | --- | --- |
-| http://localhost:3080 | API bilgisi ve sürüm |
-| http://localhost:3080/health/live | API süreci çalışıyor mu? |
-| http://localhost:3080/health/ready | API veritabanına erişebiliyor mu? |
-| http://localhost:9095 | Prometheus sorguları, hedefler ve alarmlar |
+| `npm run check` | API kaynak dosyalarının sözdizimi |
+| `npm test` | HTTP davranışı, token kontrolü, geçersiz girdi, veritabanı kesintisi yanıtları, metrik/log davranışı |
+| `npm run test:integration` | Gerçek PostgreSQL üzerinde CRUD, bağlantılar arasında veri kalıcılığı ve tekrarlanan şema kurulumu |
+| `npm run smoke` | Çalışan sistemde readiness, kimlik doğrulama, CRUD ve metrik uçları |
+| `npm run test:backup` | Gerçek bir görevin yedeklenip ayrı veritabanına yüklenmesi ve mevcut hedefin korunması |
 
-Portlar `.env` dosyasında değiştirilebilir. API ve Prometheus yalnızca `127.0.0.1` üzerinde açılır. PostgreSQL varsayılan olarak host’a port açmaz.
+Entegrasyon testi için ayrı `TEST_DATABASE_URL`, smoke ve yedek testi için çalışan servisler gerekir. Ayrıntılar [yerel geliştirme rehberindedir](docs/local-development.md).
 
-## İlk görevini oluştur
+CI, PR ve `main` push’larında bu kontrolleri çalıştırır. Başarılı `main` çalışması imajı yayımlar; Railway, GitHub kontrolleri tamamlandıktan sonra dağıtıma geçer. Test sonuçlarının güncel kaynağı [Actions geçmişidir](https://github.com/asdakif/devops-lab/actions).
 
-Bu komutları proje klasöründe çalıştır. Token terminal çıktısına yazdırılmaz:
+## Tasarım kararları ve sınırlar
 
-```bash
-set -a
-source .env
-set +a
+- **Tek servis ve ilişkisel veritabanı:** Küçük uygulama alanı, test ve dağıtım akışını takip etmeyi kolaylaştırır.
+- **Ayrı liveness/readiness uçları:** Sürecin çalışması ile veritabanına erişebilmesi ayrı ayrı ölçülür.
+- **Ortak Bearer token:** Bu sürüm tek kullanıcı/operatör kullanımına yöneliktir; kullanıcı hesapları, roller ve görev sahipliği bulunmaz.
+- **Kontrollü metrik etiketleri:** Her görev UUID’si için ayrı metrik serisi üretilmez.
+- **Basit şema kurulumu:** Başlangıçta tablo oluşturulur; sürümlü bir migration altyapısı henüz yoktur.
 
-curl -sS "http://localhost:${API_PORT}/tasks" \
-  -H "Authorization: Bearer $API_TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"title":"İlk CI akışımı çalıştır"}'
+Prometheus alarm kuralları mevcuttur; haricî bildirim alıcısı bağlı değildir. Yük testi, yüksek erişilebilirlik ve kesintisiz dağıtım garantisi bu projenin doğrulanmış kapsamına dahil değildir. [Kararların gerekçeleri ve ödünleşimleri →](docs/architecture.md)
 
-curl -sS "http://localhost:${API_PORT}/tasks" \
-  -H "Authorization: Bearer $API_TOKEN"
-```
+## Sonraki geliştirmeler
 
-Dönen `id` değerini aşağıdaki `TASK_ID` yerine koy:
+- [ ] Canlı Prometheus/Alertmanager kurulumu ve bildirim kanalı.
+- [ ] Zamanlanmış, uzak konuma alınan yedekler ve düzenli kurtarma doğrulaması.
+- [ ] Sürümlü veritabanı migration’ları ve staging ortamı.
+- [ ] Ölçülebilir yük testi senaryoları ve gecikme/hata oranı hedefleri.
+- [ ] Yerel ve canlı PostgreSQL ana sürümlerinin eşitlenmesi.
 
-```bash
-curl -sS -X PATCH "http://localhost:${API_PORT}/tasks/TASK_ID" \
-  -H "Authorization: Bearer $API_TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"completed":true}'
+## Rehberler
 
-curl -i -X DELETE "http://localhost:${API_PORT}/tasks/TASK_ID" \
-  -H "Authorization: Bearer $API_TOKEN"
-```
-
-| Metot | Yol | Sonuç |
-| --- | --- | --- |
-| GET | `/tasks?limit=50&offset=0` | Görev listesi; limit en çok 100 |
-| POST | `/tasks` | `{ "title": "..." }` ile oluştur, 201 |
-| GET | `/tasks/:id` | Tek görevi oku |
-| PATCH | `/tasks/:id` | Başlığı ve/veya `completed` alanını değiştir |
-| DELETE | `/tasks/:id` | Görevi sil, 204 |
-| GET | `/metrics` | Prometheus metrikleri |
-
-Görev ve metrik uçları `Authorization: Bearer TOKEN` ister. Başlık 1–200 karakter olmalıdır. Hatalar JSON döner: 400 geçersiz girdi, 401 yetkisiz, 404 bulunamadı, 413 büyük istek, 500 sunucu hatası. Hazır olmayan veritabanında readiness 503 döner.
-
-## Nasıl çalışır?
-
-```mermaid
-flowchart LR
-    Client[curl / Postman] --> API[Node.js API :3080]
-    API --> DB[(PostgreSQL)]
-    Prom[Prometheus :9095] -->|token ile /metrics| API
-    Git[GitHub push / PR] --> Tests[Testler + Docker smoke]
-    Tests --> Image[GHCR sürüm imajı]
-    Image -->|CD etkinse| Host[Docker sunucusu]
-    Host --> Health[Sağlık kontrolü]
-    Health -->|başarısızsa| Previous[Önceki imaja dön]
-```
-
-API başlangıcında mevcut veriyi koruyan ilk şema oluşturulur. Konteyner root olmayan kullanıcıyla çalışır, dosya sistemi salt okunurdur. PostgreSQL verileri volume’de tutulur. `docker compose down` verileri korur; `down -v` volume’leri ve içlerindeki verileri siler.
-
-## Geliştirme ve test
-
-Yalnızca veritabanını Docker’da, API’yi bilgisayarında çalıştırmak için:
-
-```bash
-docker compose stop api
-docker compose -f compose.yaml -f compose.dev.yaml up -d --wait db
-npm run dev
-```
-
-Veritabanı geliştirme modunda `127.0.0.1:5435` adresinden erişilir. `.env` dosyasındaki `DATABASE_URL` bu porta ayarlıdır.
-
-```bash
-npm run check
-npm test
-npm run smoke
-```
-
-`npm test` HTTP sözleşmesini, doğrulamayı, token kontrolünü, hata yanıtlarını ve metrikleri test eder. `npm run smoke` çalışan sistemde geçici bir görev oluşturup siler. Gerçek PostgreSQL testi için ayrı test veritabanı kullan:
-
-```bash
-docker compose exec db sh -c 'createdb -U "$POSTGRES_USER" task_api_test'
-set -a
-source .env
-set +a
-TEST_DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:5435/task_api_test" npm run test:integration
-```
-
-Test veritabanı zaten varsa `createdb` adımını atla. Entegrasyon testi kendi UUID’siyle oluşturduğu satırı temizler; diğer satırları silmez.
-
-Çalışan yerel Compose ortamında `npm run test:backup` gerçek bir görevle yedek/restore turunu ve var olan hedefin üzerine yazılmadığını doğrular. Test sonunda kendi görevini, yedeğini ve geçici restore veritabanını temizler.
-
-## İzleme
-
-```bash
-docker compose ps
-docker compose logs --tail=100 -f api
-docker compose exec prometheus promtool check config /etc/prometheus/prometheus.yml
-```
-
-Loglar JSON biçimindedir: istek kimliği, metot, rota, durum kodu ve süre. Token ve görev başlıkları loglanmaz. Metriklerde her UUID için ayrı seri oluşturulmaz.
-
-Prometheus’ta denenecek sorgular:
-
-```promql
-up{job="task-api"}
-app_database_ready
-sum(rate(http_requests_total[5m])) by (status)
-histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))
-```
-
-`monitoring/alerts.yml` üç alarm içerir: API erişilemiyor, veritabanı erişilemiyor, 5xx hata oranı %5’i aşıyor. Durumlar Prometheus **Alerts** ekranında görünür. E-posta/Slack bildirimi için henüz bir alıcı bağlanmadı; sonraki aşamada Alertmanager eklenebilir.
-
-## Yedekleme, geri yükleme ve sürüm geri alma
-
-```bash
-bash scripts/backup.sh
-bash scripts/restore.sh backups/KOMUTUN_DONDURDUGU_DOSYA devops_restore_drill
-```
-
-Yedek, `pg_dump` custom formatındadır. Geri yükleme yalnızca `devops_restore_` önekiyle **yeni** bir veritabanı oluşturur; var olan hedefin üzerine yazmaz ve API’yi otomatik olarak o veritabanına geçirmez. Başarısız bir restore boş bir hedef veritabanı bırakabilir; sonraki denemede yeni bir isim kullan. Gerçek kurtarma geçişi için [operasyon rehberini](docs/operations.md) izle.
-
-Dağıtım ve imaj geri alma:
-
-```bash
-bash scripts/deploy.sh ghcr.io/OWNER/REPO@sha256:DIGEST
-bash scripts/rollback.sh
-```
-
-Dağıtım yeni imajı indirir, servisi başlatır ve readiness kontrolünü bekler. Başarısızsa önceki yerel imaj kimliğiyle yeniden başlatır. Başarılı dağıtımın ardından `rollback.sh` önceki sürüme dönebilir. Bu tek sunuculu akış kısa kesinti içerebilir; veritabanı şemasını geri almaz. Yıkıcı şema değişikliklerinden önce ayrı migration planı gerekir.
-
-## GitHub CI/CD’yi bağla
-
-GitHub deposu: [asdakif/devops-lab](https://github.com/asdakif/devops-lab) (özel). `.github/workflows/ci.yml` şu akışı çalıştırır:
-
-1. PR ve `main` push’larında HTTP + PostgreSQL testleri ve Docker smoke testi.
-2. Başarılı `main` çalışmasında GHCR’ye commit etiketiyle imaj yükleme.
-3. `DEPLOY_ENABLED=true` ise `production` ortamı üzerinden sunucuya digest ile dağıtım.
-
-Canlı Railway ayarları ve alternatif Linux/SSH kurulumu [dağıtım rehberinde](docs/deployment.md). Dockerfile, readiness ve CI bekleme ayarlarını yeniden uygulamak için `infra/railway-production.graphql` ile `infra/railway-production.json` kullanılır; bu dosyalar gizli değer içermez.
-
-## Öğrenme sırası
-
-- [ ] Bir görev oluştur, tamamla ve sil; HTTP durum kodlarını incele.
-- [ ] Başlık kuralını değiştir, test ekle, yerelde çalıştır.
-- [ ] Konteyneri yeniden başlat ve verinin korunduğunu gör.
-- [ ] Pull request açıp başarısız bir testi CI’da gözlemle ve düzelt.
-- [ ] Prometheus’ta istek hızını ve gecikmeyi sorgula.
-- [ ] `docs/operations.md` ile veritabanı arızası ve yedekten kurtarma denemesi yap.
-- [ ] GitHub ve sunucunu bağla; bir sürüm yayımla, önceki sürüme dön.
-
-## Başvurular
-
-- [Docker Compose başlangıç ve sağlık kontrolü sırası](https://docs.docker.com/compose/how-tos/startup-order/)
-- [Prometheus alarm kuralları](https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/)
-- [Resmî Prometheus Node.js istemcisi](https://github.com/prometheus/client_js)
+- [Yerel geliştirme ve API kullanımı](docs/local-development.md)
+- [Mimari kararlar](docs/architecture.md)
+- [Canlı dağıtım ve alternatif Linux kurulumu](docs/deployment.md)
+- [Arıza, yedekleme ve geri dönüş senaryoları](docs/operations.md)
+- [Proje sunumu ve demo akışı](docs/project-walkthrough.md)
