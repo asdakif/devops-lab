@@ -2,7 +2,7 @@
 
 [Proje tanıtımı](../README.md) · [Dağıtım](deployment.md) · [Operasyon](operations.md)
 
-Bu belge mevcut uygulamanın kararlarını, sonuçlarını ve sınırlarını açıklar. Performans veya erişilebilirlik için ölçülmemiş sonuçlar ileri sürmez.
+Uygulama ve dağıtım akışındaki kararlarla ilgili kısa notlar.
 
 ## Küçük uygulama alanı, tek API
 
@@ -20,7 +20,7 @@ Compose; bağımlılık sırasını, yerel portları, salt okunur API dosya sist
 
 GitHub Actions önce HTTP testlerini ve gerçek PostgreSQL entegrasyonunu çalıştırır. Ardından Compose ortamını başlatır, smoke/yedek testlerini ve Prometheus kural kontrolünü yürütür. Başarılı `main` çalışması GHCR imajını commit SHA etiketiyle yayımlar.
 
-Railway’in GitHub bağlantısındaki `checkSuites` ayarı başarılı kontrolleri bekler. Kaynak build sonrası `/health/ready` kullanılır. GHCR imajı ile Railway’in kendi oluşturduğu imajın aynı digest’e sahip olduğu iddia edilmez. İlişki, kaynak commit üzerinden izlenir; API sağlık yanıtı bu SHA değerini döndürür.
+Railway’in GitHub bağlantısındaki `checkSuites` ayarı başarılı kontrolleri bekler. Kaynak build sonrası `/health/ready` kullanılır. GHCR ve Railway imajları ayrı build edilir; çalışan sürüm kaynak commit üzerinden izlenir. API sağlık yanıtı bu SHA değerini döndürür.
 
 Alternatif SSH dağıtım işi varsayılan olarak kapalıdır. Linux/Compose betikleri yeni imajın sağlık kontrolü başarısızsa önceki imajı yeniden çalıştırmayı dener. Bu davranış Railway için bir rollback garantisi değildir; Compose rollback betikleri CI’da uçtan uca test edilmez.
 
